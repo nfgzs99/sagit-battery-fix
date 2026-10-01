@@ -1,44 +1,38 @@
-Skip to content
-sagit-battery-fix
-Repository navigation
-Code
-Issues
-Pull requests
-Agents
-Build Kernel
-Build Kernel #2
-Annotations
-1 error and 1 warning
-build
-failed 21 minutes ago in 1m 16s
-1s
-1s
-46s
-0s
-23s
-3s
-Run cd src
-make[1]: Entering directory '/home/runner/work/sagit-battery-fix/sagit-battery-fix/src/out'
-  HOSTCC  scripts/basic/fixdep
-  GEN     ./Makefile
-  HOSTCC  scripts/kconfig/conf.o
-  SHIPPED scripts/kconfig/zconf.tab.c
-  SHIPPED scripts/kconfig/zconf.lex.c
-  SHIPPED scripts/kconfig/zconf.hash.c
-  HOSTCC  scripts/kconfig/zconf.tab.o
-  HOSTLD  scripts/kconfig/conf
-#
-# configuration written to .config
-#
-make[1]: Leaving directory '/home/runner/work/sagit-battery-fix/sagit-battery-fix/src/out'
-make[1]: Entering directory '/home/runner/work/sagit-battery-fix/sagit-battery-fix/src/out'
-  GEN     ./Makefile
-scripts/kconfig/conf  --silentoldconfig Kconfig
-arch/arm64/Makefile:28: ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum
-arch/arm64/Makefile:68: *** CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built.  Stop.
-make[1]: Leaving directory '/home/runner/work/sagit-battery-fix/sagit-battery-fix/src/out'
-make: *** [Makefile:152: sub-make] Error 2
-Error: Process completed with exit code 2.
-0s
-0s
-1s
+name: Build Kernel
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+
+      - name: Clone LineageOS kernel source
+        run: |
+          git clone --depth 1 -b lineage-22.2 https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git src
+          cd src
+          git log --oneline -1
+
+      - name: Apply battery modifications
+        run: |
+          cp batterydata-sagit-atl-3350mAh.dtsi src/arch/arm64/boot/dts/qcom/xiaomi/
+          cp sagit-msm8998-mtp.dtsi src/arch/arm64/boot/dts/qcom/xiaomi/
+          cp qpnp-fg-gen3.c src/drivers/power/supply/qcom/
+
+      - name: Install toolchain
+        run: |
+          sudo apt update
+          sudo apt install -y bc bison build-essential ccache flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev libelf-dev libgnutls28-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Build kernel
+        run: |
+          cd src
+          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- sagit_defconfig
+          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- -j$(nproc --all)
+
+      - name: Upload Image.gz-dtb
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel
+          path: src/out/arch/arm64/boot/Image.gz-dtb
