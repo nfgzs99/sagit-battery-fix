@@ -1,1 +1,39 @@
 
+name: Build Kernel
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+
+      - name: Clone LineageOS kernel source
+        run: |
+          git clone --depth 1 -b lineage-22.2 https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git src
+          cd src
+          git log --oneline -1
+
+      - name: Apply battery modifications
+        run: |
+          cp batterydata-sagit-atl-3350mAh.dtsi src/arch/arm64/boot/dts/qcom/xiaomi/
+          cp sagit-msm8998-mtp.dtsi src/arch/arm64/boot/dts/qcom/xiaomi/
+          cp qpnp-fg-gen3.c src/drivers/power/supply/qcom/
+
+      - name: Install toolchain
+        run: |
+          sudo apt update
+          sudo apt install -y bc bison build-essential ccache flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev libelf-dev libgnutls28-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3
+
+      - name: Build kernel
+        run: |
+          cd src
+          make ARCH=arm64 O=out sagit_defconfig
+          make ARCH=arm64 O=out -j$(nproc --all)
+
+      - name: Upload Image.gz-dtb
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel
+          path: src/out/arch/arm64/boot/Image.gz-dtb
